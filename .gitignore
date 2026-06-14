@@ -1,0 +1,32 @@
+# Python bytecode and cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment (do not track!)
+venv/
+env/
+ENV/
+.venv/
+
+# IDE settings
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# SSH keys and encryption keys (SENSITIVE - NEVER COMMIT!)
+.ssh_key.txt
+ssh_credentials.enc
+
+# Log files
+*.log
+
+# Test data if any
+test_data/
+fixtures/
