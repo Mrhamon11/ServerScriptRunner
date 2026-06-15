@@ -1,8 +1,7 @@
 #!/bin/bash
 
 # Server Script Runner Launcher
-# This script handles both initial setup and running the app
-# Usage: ./run_server_script_runner.sh
+# Fixed cleanup logic for proper process termination
 
 set -e  # Exit on error
 
@@ -16,6 +15,8 @@ echo ""
 
 # Configuration
 KEY_FILE="$HOME/.ssh_key.txt"
+APP_PID=""
+WAIT_TIMEOUT=5  # How long to wait before force killing
 
 # Function to generate encryption key (first time only)
 generate_key() {
@@ -82,30 +83,76 @@ launch_app() {
     # Activate virtual environment
     source venv/bin/activate
     
-    # Try to run the app
-    python main_app.py 2>&1 &
-    
-    # Get the PID of the started process
+    # Try to run the app in background but capture PID
+    python main_app.py > /tmp/server_script_runner.log 2>&1 &
     APP_PID=$!
     
     echo ""
     echo "✓ Application is running (PID: $APP_PID)"
     echo ""
-    echo "Press Ctrl+C to close the application window."
+    echo "Press Ctrl+C or close the GUI window to exit."
+    echo "(Process will be cleaned up automatically)"
     echo ""
 }
 
-# Function to cleanup on exit
+# Function to cleanup on exit - handles app and processes properly
 cleanup() {
-    if [ -n "$APP_PID" ] && kill -0 "$APP_PID" 2>/dev/null; then
-        echo "Closing application..."
-        kill "$APP_PID" 2>/dev/null || pkill -f "python.*main_app" 2>/dev/null || true
-        deactivate 2>/dev/null || true
+    if [ -n "$APP_PID" ]; then
+        echo ""
+        echo "=========================================="
+        echo "   Shutting down..."
+        echo "=========================================="
+        
+        # Wait for process to close gracefully
+        local count=0
+        while kill -0 "$APP_PID" 2>/dev/null && [ $count -lt $WAIT_TIMEOUT ]; do
+            echo "   Waiting for graceful shutdown (attempt $((count+1))/$WAIT_TIMEOUT)..."
+            sleep 1
+            ((count++))
+        done
+        
+        # Process still running? Check if it's zombie or real process
+        if kill -0 "$APP_PID" 2>/dev/null; then
+            local is_zombie=$(ps -p "$APP_PID" -o stat= 2>/dev/null | grep -c '^Z' || echo "0")
+            
+            if [ "$is_zombie" = "1" ]; then
+                echo "   Process appears to be zombie, terminating..."
+                kill -9 "$APP_PID" 2>/dev/null || true
+            else
+                echo "   Force killing application process..."
+                kill -9 "$APP_PID" 2>/dev/null || true
+            fi
+            
+            # Wait for it to actually die
+            sleep 1
+        fi
+        
+        # Kill any remaining main_app processes
+        local remaining=$(pgrep -f "python.*main_app\.py" 2>/dev/null | wc -l)
+        if [ "$remaining" -gt 0 ]; then
+            echo "   Cleaning up additional Python processes..."
+            pgrep -f "python.*main_app\.py" 2>/dev/null | xargs kill -9 2>/dev/null || true
+        fi
+        
+        # Kill any orphaned child processes
+        local orphans=$(pgrep --parent "$APP_PID" 2>/dev/null)
+        if [ -n "$orphans" ]; then
+            echo "   Removing orphaned children..."
+            pkill -P "$APP_PID" 2>/dev/null || true
+        fi
+        
+        APP_PID=""
     fi
+    
+    # Deactivate venv
+    deactivate 2>/dev/null || true
+    
+    echo ""
+    echo "✓ Cleanup complete. You should see your shell prompt."
 }
 
-# Set up cleanup trap
-trap cleanup EXIT INT TERM
+# Set up cleanup trap for signals (Ctrl+C, close window, etc.)
+trap cleanup SIGINT SIGTERM EXIT
 
 # Main execution flow
 echo "=========================================="

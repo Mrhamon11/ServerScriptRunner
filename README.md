@@ -73,6 +73,12 @@ The launcher script:
 - Installs dependencies if needed
 - Handles all setup steps transparently
 
+### Closing the App:
+- Press **X** in the terminal, or use GUI window controls to close
+- Application will clean up gracefully
+- You'll return to your shell prompt after a brief moment
+- **If app doesn't close cleanly:** Close terminal and reopen - script handles cleanup automatically
+
 4. **Credentials are automatically encrypted and saved** on each field change!
 ## 📁 Project Structure
 
