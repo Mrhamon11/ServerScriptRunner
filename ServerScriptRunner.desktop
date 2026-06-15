@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=ServerScriptRunner
+Comment=Launch ServerScriptRunner
+Exec=/home/hamon/Documents/Projects/ServerScriptRunner/run_server_script_runner.sh
+Icon=/home/hamon/Documents/Projects/ServerScriptRunner/ServerScriptRunner.png
+Terminal=false
+Type=Application
+
+#~/.local/share/applications
