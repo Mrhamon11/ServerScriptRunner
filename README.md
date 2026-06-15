@@ -60,8 +60,16 @@ A Python GUI application for SSH-ing to remote servers and executing scripts sec
    - Click **"Start"** to run the start script
    - Click **"Stop"** to run the stop script
 
-4. **Credentials are automatically encrypted and saved** on each field change!
+### Alternative: Use the launcher script (recommended!)
+```bash
+./run_server_script_runner.sh
+```
+The launcher script:
+- Automatically sets up the virtual environment on first run
+- Installs dependencies if needed
+- Handles all setup steps transparently
 
+4. **Credentials are automatically encrypted and saved** on each field change!
 ## 📁 Project Structure
 
 ```
