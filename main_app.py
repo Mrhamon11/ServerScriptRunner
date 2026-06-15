@@ -22,8 +22,24 @@ class ServerScriptRunnerApp(QWidget):
         
         # Auto-populate if credentials exist
         try:
-            decrypted_password = CredentialManager.decrypt_credentials(self.credential_path)
-            self.password_field.setText(decrypted_password)
+            decrypted_data = CredentialManager.decrypt_credentials(self.credential_path)
+            if decrypted_data:
+                # Parse all fields from decrypted data
+                lines = decrypted_data.split('\n')
+                for line in lines:
+                    if line.startswith('host='):
+                        self.host_field.setText(line[5:].strip())
+                    elif line.startswith('port='):
+                        self.port_field.setText(line[5:].strip())
+                    elif line.startswith('username='):
+                        self.username_field.setText(line[9:].strip())
+                    elif line.startswith('password='):
+                        self.password_field.setText(line[9:].strip())
+                    elif line.startswith('start_script='):
+                        self.start_script_field.setText(line[13:].strip())
+                    elif line.startswith('stop_script='):
+                        self.stop_script_field.setText(line[12:].strip())
+            print(f"Loaded credentials: {len([l for l in lines if '=' in l])} fields")
         except FileNotFoundError:
             pass  # No saved credentials, fields will be empty
         except Exception as e:
