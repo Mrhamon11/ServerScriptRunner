@@ -14,6 +14,27 @@ echo "   Server Script Runner Launcher"
 echo "=========================================="
 echo ""
 
+# Configuration
+KEY_FILE="$HOME/.ssh_key.txt"
+
+# Function to generate encryption key (first time only)
+generate_key() {
+    if [ ! -f "$KEY_FILE" ]; then
+        echo "⚠️  Encryption key not found. Generating new key..."
+        if source venv/bin/activate 2>/dev/null; then
+            python keygen.py > "$KEY_FILE"
+            deactivate 2>/dev/null || true
+            echo "✓ Generated encryption key: ~/.ssh_key.txt"
+        else
+            echo "⚠️  Could not activate virtual environment. Generating key anyway..."
+            python3 keygen.py > "$KEY_FILE"
+            echo "✓ Generated encryption key: ~/.ssh_key.txt"
+        fi
+    else
+        echo "✓ Encryption key exists: ~/.ssh_key.txt"
+    fi
+}
+
 # Function to check if venv exists and is valid
 check_venv() {
     if [ ! -d "venv" ]; then
@@ -92,6 +113,7 @@ echo "   Phase 1: Setup (if needed)"
 echo "=========================================="
 check_venv
 install_dependencies
+generate_key
 
 echo ""
 echo "=========================================="

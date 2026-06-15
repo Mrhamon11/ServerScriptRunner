@@ -36,9 +36,13 @@ A Python GUI application for SSH-ing to remote servers and executing scripts sec
    pip install -r requirements.txt
    ```
 
-4. **Generate encryption key (first time only):**
+4. **Generate encryption key (automatic - first time only):**
+   
+The launcher script (`run_server_script_runner.sh`) will automatically generate
+   the encryption key on your first run. The manual command below is optional:
+
    ```bash
-   python keygen.py
+   python keygen.py  # Generates ~/.ssh_key.txt
    ```
    This creates `~/.ssh_key.txt` for encrypting credentials.
 
