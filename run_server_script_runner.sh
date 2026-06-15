@@ -1,22 +1,16 @@
 #!/bin/bash
 
-# Server Script Runner Launcher
-# Fixed cleanup logic for proper process termination
-
-set -e  # Exit on error
+# Server Script Runner Launcher - Desktop File Optimized
+# Handles .desktop file launches and signal cleanup properly
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "=========================================="
-echo "   Server Script Runner Launcher"
-echo "=========================================="
-echo ""
-
 # Configuration
 KEY_FILE="$HOME/.ssh_key.txt"
 APP_PID=""
-WAIT_TIMEOUT=5  # How long to wait before force killing
+WAIT_TIMEOUT=10  # Longer wait for desktop file launches
+DEBUG=false
 
 # Function to generate encryption key (first time only)
 generate_key() {
@@ -83,7 +77,7 @@ launch_app() {
     # Activate virtual environment
     source venv/bin/activate
     
-    # Try to run the app in background but capture PID
+    # Run the app (output redirected for cleaner log)
     python main_app.py > /tmp/server_script_runner.log 2>&1 &
     APP_PID=$!
     
@@ -95,77 +89,81 @@ launch_app() {
     echo ""
 }
 
-# Function to cleanup on exit - handles app and processes properly
+# Function to cleanup on exit
 cleanup() {
     if [ -n "$APP_PID" ]; then
-        echo ""
-        echo "=========================================="
-        echo "   Shutting down..."
-        echo "=========================================="
+        # Only cleanup if we're actually being asked to exit (not during setup)
+        local should_cleanup=false
         
-        # Wait for process to close gracefully
+        # Check if called via terminal signal (Ctrl+C, window close)
+        if [ "$(tty)" != "/dev/tty" ] || [ -t 0 ]; then
+            echo ""
+            echo "=========================================="
+            echo "   Shutting down..."
+            echo "=========================================="
+            
+            should_cleanup=true
+        fi
+        
+        # Wait for process to close gracefully (longer timeout)
         local count=0
         while kill -0 "$APP_PID" 2>/dev/null && [ $count -lt $WAIT_TIMEOUT ]; do
-            echo "   Waiting for graceful shutdown (attempt $((count+1))/$WAIT_TIMEOUT)..."
             sleep 1
             ((count++))
+            
+            # Check if process is still responding
+            if ! ps -p "$APP_PID" -o pid,ppid,args >/dev/null 2>&1; then
+                break
+            fi
         done
         
-        # Process still running? Check if it's zombie or real process
+        # Process still running? Force kill it
         if kill -0 "$APP_PID" 2>/dev/null; then
-            local is_zombie=$(ps -p "$APP_PID" -o stat= 2>/dev/null | grep -c '^Z' || echo "0")
+            echo "   Waiting for graceful shutdown (attempt $((count+1))/$WAIT_TIMEOUT)..."
             
-            if [ "$is_zombie" = "1" ]; then
-                echo "   Process appears to be zombie, terminating..."
-                kill -9 "$APP_PID" 2>/dev/null || true
-            else
-                echo "   Force killing application process..."
-                kill -9 "$APP_PID" 2>/dev/null || true
-            fi
+            local remaining=10
+            while kill -0 "$APP_PID" 2>/dev/null && [ $remaining -gt 0 ]; do
+                sleep 2
+                ((remaining--))
+                
+                # Check if still running
+                if ! ps -p "$APP_PID" -o pid,ppid,stat >/dev/null 2>&1; then
+                    break
+                fi
+                
+                echo "   Still waiting (attempt $((WAIT_TIMEOUT-count+1))/$WAIT_TIMEOUT)..."
+            done
+        fi
+        
+        # Force kill if still running after timeout
+        if kill -0 "$APP_PID" 2>/dev/null; then
+            echo "   Force killing application process (PID: $APP_PID)..."
+            kill -9 "$APP_PID" 2>/dev/null || true
             
             # Wait for it to actually die
             sleep 1
-        fi
-        
-        # Kill any remaining main_app processes
-        local remaining=$(pgrep -f "python.*main_app\.py" 2>/dev/null | wc -l)
-        if [ "$remaining" -gt 0 ]; then
-            echo "   Cleaning up additional Python processes..."
-            pgrep -f "python.*main_app\.py" 2>/dev/null | xargs kill -9 2>/dev/null || true
-        fi
-        
-        # Kill any orphaned child processes
-        local orphans=$(pgrep --parent "$APP_PID" 2>/dev/null)
-        if [ -n "$orphans" ]; then
-            echo "   Removing orphaned children..."
-            pkill -P "$APP_PID" 2>/dev/null || true
+            
+            # Clean up any remaining main_app processes
+            local remaining=$(pgrep -f "python.*main_app\.py" 2>/dev/null | wc -l)
+            if [ "$remaining" -gt 0 ]; then
+                echo "   Cleaning up additional Python processes..."
+                pgrep -f "python.*main_app\.py" 2>/dev/null | xargs kill -9 2>/dev/null || true
+            fi
         fi
         
         APP_PID=""
     fi
     
-    # Deactivate venv
+    # Deactivate venv (silently)
     deactivate 2>/dev/null || true
-    
-    echo ""
-    echo "✓ Cleanup complete. You should see your shell prompt."
 }
 
-# Set up cleanup trap for signals (Ctrl+C, close window, etc.)
+# Set up cleanup trap for signals
 trap cleanup SIGINT SIGTERM EXIT
 
 # Main execution flow
-echo "=========================================="
-echo "   Phase 1: Setup (if needed)"
-echo "=========================================="
 check_venv
 install_dependencies
 generate_key
-
-echo ""
-echo "=========================================="
-echo "   Ready to launch!"
-echo "=========================================="
-echo ""
 
 launch_app
